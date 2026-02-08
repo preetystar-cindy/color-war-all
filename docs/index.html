@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <title>Color War</title>
+  <style>
+    html,body{margin:0;height:100%;background:#111;overflow:hidden;font-family:system-ui,-apple-system,Segoe UI,Roboto,"PingFang SC","Noto Sans CJK SC",sans-serif}
+    #ui{
+      position:fixed;left:12px;top:12px;right:12px;
+      display:flex;gap:8px;align-items:center;flex-wrap:wrap;
+      color:#fff;z-index:10;
+    }
+    .card{
+      background:rgba(0,0,0,.45);backdrop-filter: blur(6px);
+      border:1px solid rgba(255,255,255,.15);border-radius:12px;padding:10px 12px;
+    }
+    input{
+      border-radius:10px;border:1px solid rgba(255,255,255,.25);
+      background:rgba(255,255,255,.08);color:#fff;padding:8px 10px;outline:none
+    }
+    button{
+      border-radius:10px;border:1px solid rgba(255,255,255,.25);
+      background:rgba(255,255,255,.12);color:#fff;padding:8px 10px;
+    }
+    #canvas{width:100vw;height:100vh;display:block}
+    #me{margin-left:6px;opacity:.95}
+  </style>
+</head>
+<body>
+  <div id="ui">
+    <div class="card">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <label>Room:</label>
+        <input id="room" value="room1" />
+        <label>WS:</label>
+        <input id="ws" style="min-width:260px" value="wss://color-war-server.onrender.com" />
+        <button id="connect">Connect</button>
+        <button id="motion">Enable Motion</button>
+        <button id="reset">Reset</button>
+        <span id="me">我是谁：?</span>
+      </div>
+      <div style="margin-top:6px;font-size:12px;opacity:.9" id="status">状态：未连接</div>
+      <div style="margin-top:6px;font-size:12px;opacity:.8">
+        A(粉)：向左倾才有力｜B(蓝)：向右倾才有力｜回正会回到中线
+      </div>
+    </div>
+  </div>
+
+  <canvas id="canvas"></canvas>
+
+<script>
+  const canvas = document.getElementById("canvas");
+  const ctx = canvas.getContext("2d");
+
+  function resize(){
+    canvas.width = Math.floor(window.innerWidth * devicePixelRatio);
+    canvas.height = Math.floor(window.innerHeight * devicePixelRatio);
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  const $ = (id)=>document.getElementById(id);
+
+  const COLOR_A = "#ff4d7d"; // 左粉
+  const COLOR_B = "#40c4ff"; // 右蓝
+
+  let ws = null;
+  let connected = false;
+
+  let role = null;       // "A" or "B"
+  let myId = null;
+
+  let motionEnabled = false;
+  let raw = 0;           // 0..1 (带死区后的力量)
+  let power = 0;         // 平滑后的 0..1
+  let p = 0.5;           // 服务器发来的 0..1
+  let winner = null;
+  let players = [];
+
+  function setStatus(t){ $("status").textContent = "状态：" + t; }
+  function clamp01(x){ return Math.max(0, Math.min(1, x)); }
+
+  // ✅ iPhone 权限
+  async function enableMotion(){
+    try{
+      if(typeof DeviceOrientationEvent !== "undefined" &&
+         typeof DeviceOrientationEvent.requestPermission === "function"){
+        const res = await DeviceOrientationEvent.requestPermission();
+        // res 可能是 "granted"；即便不是也继续，让你能看到调试值
+      }
+      motionEnabled = true;
+      setStatus("运动权限已启用（现在倾斜手机）");
+    }catch(e){
+      motionEnabled = true; // 尽量别卡死
+      setStatus("已尝试启用运动权限（若没反应请用 Safari）");
+    }
+  }
+
+  // ✅ 方向规则：A 左倾才有力；B 右倾才有力；回正死区=0
+  window.addEventListener("deviceorientation", (e)=>{
+    if(!motionEnabled) return;
+
+    const gamma = e.gamma || 0; // 左右倾斜，通常右正左负
+    const dead = 8;             // 回正死区（度）
+    const maxDeg = 55;          // 接近满力（度）
+
+    // role 未拿到前先按 A 处理
+    const signed = (role === "B") ? gamma : -gamma; // 朝自己方向为正
+
+    if (signed < dead) raw = 0;
+    else raw = clamp01((signed - dead) / (maxDeg - dead));
+  }, true);
+
+  function connect(){
+    const room = $("room").value.trim() || "room1";
+    const url  = $("ws").value.trim();
+
+    myId = "p" + Math.random().toString(16).slice(2,6);
+
+    if(ws) ws.close();
+
+    ws = new WebSocket(url);
+
+    ws.onopen = ()=>{
+      connected = true;
+      setStatus(`已连接，加入房间 ${room}...`);
+      ws.send(JSON.stringify({ type:"join", room, id: myId }));
+    };
+
+    ws.onmessage = (ev)=>{
+      let d;
+      try{ d = JSON.parse(ev.data); }catch{ return; }
+
+      if(d.type === "role"){
+        role = d.role;
+        $("me").textContent = (role === "A") ? "我是谁：左边 A（粉色）" : "我是谁：右边 B（蓝色）";
+        setStatus(`房间已加入，你是 ${role}`);
+      }
+
+      if(d.type === "state"){
+        p = d.p;
+        players = d.players || [];
+        winner = d.winner || null;
+      }
+    };
+
+    ws.onclose = ()=>{
+      connected = false;
+      setStatus("已断开");
+      role = null;
+      winner = null;
+      players = [];
+    };
+
+    ws.onerror = ()=>{
+      setStatus("连接出错（检查 wss 地址 / Render 是否 Live）");
+    };
+  }
+
+  function reset(){
+    if(ws && connected){
+      ws.send(JSON.stringify({ type:"reset" }));
+    }
+  }
+
+  $("connect").onclick = connect;
+  $("motion").onclick = enableMotion;
+  $("reset").onclick  = reset;
+
+  function loop(){
+    // 平滑 power，避免抖
+    power += (raw - power) * 0.12;
+
+    // 上报给服务器
+    if(ws && ws.readyState === 1){
+      ws.send(JSON.stringify({ type:"power", value: power }));
+    }
+
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  function draw(){
+    const w = canvas.width, h = canvas.height;
+
+    // 胜利遮罩
+    if(winner){
+      ctx.fillStyle = "rgba(0,0,0,0.65)";
+      ctx.fillRect(0,0,w,h);
+      ctx.fillStyle = "#fff";
+      ctx.font = `${42*devicePixelRatio}px system-ui`;
+      ctx.textAlign = "center";
+      ctx.fillText(`${winner} WINS!`, w/2, h/2);
+      ctx.textAlign = "left";
+      return;
+    }
+
+    // 主色块（p 从服务器来）
+    const aW = Math.floor(w * p);
+
+    ctx.fillStyle = COLOR_A;
+    ctx.fillRect(0, 0, aW, h);
+
+    ctx.fillStyle = COLOR_B;
+    ctx.fillRect(aW, 0, w - aW, h);
+
+    // 中线
+    ctx.globalAlpha = 0.25;
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(aW-2, 0, 4, h);
+    ctx.globalAlpha = 1;
+
+    // 中央调试信息（你确定稳定后可以删掉这块）
+    ctx.fillStyle = "rgba(0,0,0,0.35)";
+    ctx.fillRect(w/2 - 190*devicePixelRatio, h/2 - 90*devicePixelRatio, 380*devicePixelRatio, 180*devicePixelRatio);
+
+    ctx.fillStyle = "#fff";
+    ctx.textAlign = "center";
+    ctx.font = `${18*devicePixelRatio}px system-ui`;
+    ctx.fillText(`role: ${role || "?"}   id: ${myId || "?"}`, w/2, h/2 - 35*devicePixelRatio);
+    ctx.fillText(`raw: ${raw.toFixed(2)}   power: ${power.toFixed(2)}`, w/2, h/2);
+    ctx.fillText(`p: ${p.toFixed(2)}   players: ${players.length}`, w/2, h/2 + 35*devicePixelRatio);
+
+    ctx.font = `${12*devicePixelRatio}px system-ui`;
+    const list = players.map(x => `${x.role||"?"}:${x.id}:${Number(x.power).toFixed(2)}`).join("   ");
+    ctx.fillText(list || "-", w/2, h/2 + 62*devicePixelRatio);
+
+    ctx.textAlign = "left";
+  }
+
+  loop();
+</script>
+</body>
+</html>
