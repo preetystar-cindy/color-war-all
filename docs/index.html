@@ -8,24 +8,23 @@
   <style>
     :root{
       --bg:#0b0f1a;
-      --panel: rgba(255,255,255,.08);
-      --panel2: rgba(255,255,255,.10);
       --stroke: rgba(255,255,255,.16);
       --text: rgba(255,255,255,.92);
       --muted: rgba(255,255,255,.70);
       --shadow: 0 18px 55px rgba(0,0,0,.55);
       --radius: 16px;
 
-      --A:#ff4d7d; /* Left color */
-      --B:#40c4ff; /* Right color */
+      --A:#ff4d7d; /* Left color (A / Pink) */
+      --B:#40c4ff; /* Right color (B / Blue) */
     }
 
     html,body{
       margin:0;
       height:100%;
-      background: radial-gradient(1200px 800px at 20% 10%, rgba(64,196,255,.18), transparent 60%),
-                  radial-gradient(1000px 700px at 80% 20%, rgba(255,77,125,.18), transparent 60%),
-                  var(--bg);
+      background:
+        radial-gradient(1200px 800px at 20% 10%, rgba(64,196,255,.18), transparent 60%),
+        radial-gradient(1000px 700px at 80% 20%, rgba(255,77,125,.18), transparent 60%),
+        var(--bg);
       overflow:hidden;
       font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
     }
@@ -36,7 +35,7 @@
       display:block;
     }
 
-    /* Top HUD */
+    /* ========= TOP HUD ========= */
     .hud{
       position: fixed;
       left: 12px;
@@ -45,7 +44,7 @@
       z-index: 20;
       display:flex;
       justify-content:center;
-      pointer-events:none; /* Let the game still receive touches; re-enable on panel */
+      pointer-events:none; /* Let the canvas still receive touches; re-enable on panel */
     }
 
     .panel{
@@ -83,11 +82,13 @@
       background: rgba(255,255,255,.06);
       border: 1px solid rgba(255,255,255,.10);
     }
+
     .dot{
       width:10px;height:10px;border-radius:999px;
       background: conic-gradient(from 180deg, var(--A), var(--B));
       box-shadow: 0 0 16px rgba(255,255,255,.35);
     }
+
     .title{
       color: var(--text);
       font-weight: 700;
@@ -95,6 +96,7 @@
       font-size: 14px;
       line-height: 1;
     }
+
     .subtitle{
       color: var(--muted);
       font-size: 12px;
@@ -144,9 +146,7 @@
       background: rgba(255,255,255,.14);
       border-color: rgba(255,255,255,.26);
     }
-    button:active{
-      transform: translateY(1px);
-    }
+    button:active{ transform: translateY(1px); }
 
     .btnPrimary{
       background: rgba(64,196,255,.16);
@@ -188,14 +188,11 @@
       color: var(--muted);
       font-size: 12px;
     }
-
     .pill strong{ color: var(--text); font-weight: 700; }
 
-    .help{
-      opacity:.9;
-    }
+    .help{ opacity:.9; }
 
-    /* Center debug overlay (kept on purpose) */
+    /* ========= CENTER DEBUG OVERLAY (kept) ========= */
     .debug{
       position: fixed;
       left: 50%;
@@ -245,63 +242,50 @@
       color: rgba(255,255,255,.75);
       font-size: 12px;
     }
-    .hint code{
-      color: rgba(255,255,255,.92);
-    }
+    .hint code{ color: rgba(255,255,255,.92); }
 
+    /* Slightly smaller UI on small screens */
     @media (max-width: 560px){
       input{ width: 120px; }
       input.wide{ width: 200px; }
       .big{ font-size: 28px; }
     }
-    /* ===== MOBILE COMPACT MODE ===== */
-@media (max-width: 600px) {
 
-  .panel {
-    padding: 6px 8px;
-    border-radius: 12px;
-  }
+    /* ===== MOBILE: COLLAPSIBLE HUD (won't block the screen) ===== */
+    @media (max-width: 600px){
+      /* Default: minimal bar (no screen blocking) */
+      .panel{
+        padding: 6px 8px;
+        border-radius: 14px;
+      }
 
-  .row {
-    gap: 6px;
-  }
+      .brand .subtitle,
+      .statusLine,
+      label,
+      .field{
+        display:none; /* Hide details by default on mobile */
+      }
 
-  .brand .subtitle {
-    display: none;  
-  }
+      input{ width: 90px; font-size: 12px; }
+      input.wide{ width: 140px; }
 
-  .field {
-    padding: 4px 6px;
-  }
+      button{
+        padding: 6px 8px;
+        font-size: 12px;
+      }
 
-  label {
-    display: none; 
-  }
-
-  input {
-    width: 80px;
-    font-size: 12px;
-  }
-
-  input.wide {
-    width: 120px;
-  }
-
-  button {
-    padding: 6px 8px;
-    font-size: 12px;
-  }
-
-  .statusLine {
-    display: none;  
-  }
-
-  .panel {
-    max-height: 64px;   
-    overflow: hidden;
-  }
-}
-
+      /* Expanded: show all controls */
+      .panel.expanded .field,
+      .panel.expanded .statusLine{
+        display:flex;
+      }
+      .panel.expanded label{
+        display:inline;
+      }
+      .panel.expanded .brand .subtitle{
+        display:block;
+      }
+    }
   </style>
 </head>
 
@@ -337,6 +321,9 @@
         </div>
 
         <div class="rightGroup">
+          <!-- Mobile HUD toggle (tap to expand/collapse) -->
+          <button id="toggleHud">HUD</button>
+
           <button id="connect" class="btnPrimary">Connect</button>
           <button id="motion">Enable Motion</button>
           <button id="reset" class="btnDanger">Reset</button>
@@ -363,19 +350,22 @@
   <!-- Center debug overlay (kept) -->
   <div class="debug">
     <div class="debugCard">
-      <div class="debugTop" id="debugTop">
+      <div class="debugTop">
         <span>role: <strong id="roleTxt">?</strong></span>
         <span>·</span>
         <span>id: <strong id="idTxt">?</strong></span>
         <span>·</span>
         <span>players: <strong id="playersTxt">0</strong></span>
       </div>
+
       <div class="big">
         raw <span id="rawTxt">0.00</span> · power <span id="powTxt">0.00</span>
       </div>
+
       <div class="small">
         p <span id="pTxt">0.50</span> · ws <span id="wsTxt">null</span>
       </div>
+
       <div class="hint">
         Tip: tap <strong>Connect</strong> first (get role), then <strong>Enable Motion</strong>.
       </div>
@@ -391,11 +381,14 @@
    - Receives "state" with p (color split)
    ========================= */
 
+/* Canvas setup */
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 
-/* --- UI elements --- */
+/* UI helper */
 const $ = (id) => document.getElementById(id);
+
+/* UI elements */
 const ui = {
   name: $("name"),
   setName: $("setName"),
@@ -407,6 +400,8 @@ const ui = {
   status: $("status"),
   meLabel: $("meLabel"),
 
+  toggleHud: $("toggleHud"),
+
   roleTxt: $("roleTxt"),
   idTxt: $("idTxt"),
   playersTxt: $("playersTxt"),
@@ -416,11 +411,12 @@ const ui = {
   wsTxt: $("wsTxt"),
 };
 
+/* Update status line text */
 function setStatus(text){
   ui.status.textContent = text;
 }
 
-/* --- Canvas resize (use DPR for crisp text/lines) --- */
+/* Resize canvas using device pixel ratio for crispness */
 function resize(){
   const dpr = window.devicePixelRatio || 1;
   canvas.width  = Math.floor(window.innerWidth * dpr);
@@ -429,40 +425,37 @@ function resize(){
 window.addEventListener("resize", resize);
 resize();
 
-/* --- Game state --- */
+/* Game state colors */
 const COLOR_A = getComputedStyle(document.documentElement).getPropertyValue("--A").trim();
 const COLOR_B = getComputedStyle(document.documentElement).getPropertyValue("--B").trim();
 
+/* WebSocket and player state */
 let ws = null;
-let connected = false;
+let role = null;       // "A" (left/pink) or "B" (right/blue)
+let myId = null;       // id sent to server (includes name)
+let myName = "Player"; // user-defined name
 
-let role = null;     // "A" (left/pink) or "B" (right/blue)
-let myId = null;     // unique id sent to server
-let myName = "Player";
-
-/* raw: immediate strength (0..1), power: smoothed strength (0..1) */
+/* Motion state */
 let motionEnabled = false;
-let raw = 0;
-let power = 0;
+let raw = 0;     // immediate strength [0..1]
+let power = 0;   // smoothed strength [0..1]
 
-/* p: split ratio from server, 0..1 (left color width = p) */
-let p = 0.5;
+/* Server state */
+let p = 0.5;           // split ratio [0..1]
 let players = [];
 let winner = null;
 
-/* --- Load saved name (localStorage) --- */
+/* Load saved name from localStorage */
 (function initName(){
   const saved = localStorage.getItem("colorwar_name");
   if(saved && saved.trim()){
     myName = saved.trim().slice(0, 16);
-    ui.name.value = myName;
-  }else{
-    ui.name.value = myName;
   }
+  ui.name.value = myName;
   ui.meLabel.textContent = myName;
 })();
 
-/* --- Set name button --- */
+/* Save name button */
 ui.setName.addEventListener("click", () => {
   const v = (ui.name.value || "").trim().slice(0, 16);
   if(!v){
@@ -472,43 +465,44 @@ ui.setName.addEventListener("click", () => {
   myName = v;
   localStorage.setItem("colorwar_name", myName);
   ui.meLabel.textContent = myName;
-
-  /* If already connected, you can reconnect to apply new id to the server */
   setStatus("Name set. Reconnect to apply.");
 });
 
-/* --- iOS permission request for DeviceOrientationEvent --- */
+/* Mobile HUD toggle (collapse/expand) */
+ui.toggleHud?.addEventListener("click", () => {
+  document.querySelector(".panel")?.classList.toggle("expanded");
+});
+
+/* Request motion permission on iOS, then enable motion reading */
 async function enableMotion(){
   try{
     if(typeof DeviceOrientationEvent !== "undefined" &&
        typeof DeviceOrientationEvent.requestPermission === "function"){
-      const res = await DeviceOrientationEvent.requestPermission();
-      /* res is usually "granted" on iOS */
+      await DeviceOrientationEvent.requestPermission();
     }
     motionEnabled = true;
     setStatus("Motion enabled. Tilt your phone.");
   }catch(e){
-    /* If permission flow fails, still enable and let the user test */
     motionEnabled = true;
     setStatus("Motion enabled (fallback). If no response, use Safari.");
   }
 }
 ui.motion.addEventListener("click", enableMotion);
 
-/* --- Convert tilt to raw power (directional) ---
-   A: left tilt gives power
-   B: right tilt gives power
-   Neutral tilt (dead zone) => raw = 0 (helps return to center)
+/* Convert device tilt to raw power (directional):
+   - A gains power when tilting LEFT
+   - B gains power when tilting RIGHT
+   - Neutral tilt yields raw = 0 (helps return to center)
 */
 window.addEventListener("deviceorientation", (e) => {
   if(!motionEnabled) return;
 
   const gamma = e.gamma || 0; // left/right tilt; often right positive, left negative
-  const dead = 8;             // degrees: within this range considered neutral
-  const maxDeg = 55;          // degrees: near full power
+  const dead = 8;             // degrees within this range are considered neutral
+  const maxDeg = 55;          // degrees at which we consider "full power"
 
-  /* If role is not known yet, default to A behavior */
-  const signed = (role === "B") ? gamma : -gamma; // "tilt toward your side" becomes positive
+  /* If role isn't known yet, default to A behavior */
+  const signed = (role === "B") ? gamma : -gamma; // tilt toward your side becomes positive
 
   if(signed < dead){
     raw = 0;
@@ -517,18 +511,16 @@ window.addEventListener("deviceorientation", (e) => {
   }
 }, true);
 
-/* --- Connect to WebSocket server and join room ---
-   We embed the chosen name into the id so the server can show who is who.
-*/
+/* Connect to WebSocket server and join a room */
 function connect(){
   const room = (ui.room.value || "room1").trim() || "room1";
   const url  = (ui.ws.value || "").trim();
 
-  /* Generate an id that includes name (simple and readable) */
+  /* Generate an id that includes the name (simple & readable) */
   const suffix = Math.random().toString(16).slice(2,6);
   myId = `${myName}-${suffix}`;
 
-  /* Close previous socket */
+  /* Close previous socket if it exists */
   if(ws) ws.close();
 
   try{
@@ -542,11 +534,8 @@ function connect(){
   setStatus("Connecting...");
 
   ws.onopen = () => {
-    connected = true;
     ui.wsTxt.textContent = "1";
     setStatus(`Connected. Joining room "${room}"...`);
-
-    /* Join message expected by the server */
     ws.send(JSON.stringify({ type: "join", room, id: myId }));
   };
 
@@ -554,13 +543,12 @@ function connect(){
     let d;
     try{ d = JSON.parse(ev.data); }catch{ return; }
 
-    /* Server assigns role: A or B */
     if(d.type === "role"){
       role = d.role;
       ui.roleTxt.textContent = role || "?";
       ui.idTxt.textContent = myId || "?";
 
-      const who = role === "A"
+      const who = (role === "A")
         ? `${myName} — A (Pink / Left)`
         : `${myName} — B (Blue / Right)`;
 
@@ -568,7 +556,6 @@ function connect(){
       setStatus(`Joined as ${role}. Now enable motion and tilt.`);
     }
 
-    /* State update: p, players, winner */
     if(d.type === "state"){
       p = d.p;
       players = d.players || [];
@@ -588,7 +575,6 @@ function connect(){
   };
 
   ws.onclose = () => {
-    connected = false;
     ui.wsTxt.textContent = "null";
     setStatus("Disconnected.");
     role = null;
@@ -600,7 +586,7 @@ function connect(){
 }
 ui.connect.addEventListener("click", connect);
 
-/* --- Reset round (server sets p=0.5 and clears winner) --- */
+/* Reset the round */
 function reset(){
   if(ws && ws.readyState === 1){
     ws.send(JSON.stringify({ type: "reset" }));
@@ -611,7 +597,12 @@ function reset(){
 }
 ui.reset.addEventListener("click", reset);
 
-/* --- Main loop: smooth power, send to server, draw canvas, update debug --- */
+/* Main loop:
+   - smooth motion power
+   - send power to server
+   - draw the split colors
+   - update debug overlay
+*/
 function loop(){
   /* Smooth the control signal to reduce jitter */
   power += (raw - power) * 0.12;
@@ -628,12 +619,12 @@ function loop(){
 }
 requestAnimationFrame(loop);
 
-/* --- Draw the color battle field --- */
+/* Draw the color battle field */
 function draw(){
   const w = canvas.width;
   const h = canvas.height;
 
-  /* If winner exists, show a dark overlay */
+  /* If a winner exists, show a dark overlay */
   if(winner){
     ctx.fillStyle = "rgba(0,0,0,0.65)";
     ctx.fillRect(0,0,w,h);
@@ -664,7 +655,7 @@ function draw(){
   ctx.globalAlpha = 1;
 }
 
-/* --- Update center debug overlay values --- */
+/* Update the center debug overlay values */
 function updateDebug(){
   ui.rawTxt.textContent = raw.toFixed(2);
   ui.powTxt.textContent = power.toFixed(2);
@@ -679,7 +670,7 @@ function updateDebug(){
   ui.playersTxt.textContent = String(players.length);
 }
 
-/* Start in a friendly state */
+/* Initial status message */
 setStatus("Idle. Set your name, then Connect.");
 </script>
 </body>
