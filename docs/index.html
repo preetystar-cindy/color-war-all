@@ -1,235 +1,638 @@
 <!doctype html>
-<html lang="zh">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
   <title>Color War</title>
+
   <style>
-    html,body{margin:0;height:100%;background:#111;overflow:hidden;font-family:system-ui,-apple-system,Segoe UI,Roboto,"PingFang SC","Noto Sans CJK SC",sans-serif}
-    #ui{
-      position:fixed;left:12px;top:12px;right:12px;
-      display:flex;gap:8px;align-items:center;flex-wrap:wrap;
-      color:#fff;z-index:10;
+    :root{
+      --bg:#0b0f1a;
+      --panel: rgba(255,255,255,.08);
+      --panel2: rgba(255,255,255,.10);
+      --stroke: rgba(255,255,255,.16);
+      --text: rgba(255,255,255,.92);
+      --muted: rgba(255,255,255,.70);
+      --shadow: 0 18px 55px rgba(0,0,0,.55);
+      --radius: 16px;
+
+      --A:#ff4d7d; /* Left color */
+      --B:#40c4ff; /* Right color */
     }
-    .card{
-      background:rgba(0,0,0,.45);backdrop-filter: blur(6px);
-      border:1px solid rgba(255,255,255,.15);border-radius:12px;padding:10px 12px;
+
+    html,body{
+      margin:0;
+      height:100%;
+      background: radial-gradient(1200px 800px at 20% 10%, rgba(64,196,255,.18), transparent 60%),
+                  radial-gradient(1000px 700px at 80% 20%, rgba(255,77,125,.18), transparent 60%),
+                  var(--bg);
+      overflow:hidden;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
     }
+
+    canvas{
+      width:100vw;
+      height:100vh;
+      display:block;
+    }
+
+    /* Top HUD */
+    .hud{
+      position: fixed;
+      left: 12px;
+      right: 12px;
+      top: 12px;
+      z-index: 20;
+      display:flex;
+      justify-content:center;
+      pointer-events:none; /* Let the game still receive touches; re-enable on panel */
+    }
+
+    .panel{
+      pointer-events:auto;
+      width:min(980px, 100%);
+      background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.06));
+      border: 1px solid var(--stroke);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+      padding: 12px;
+    }
+
+    .row{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+      justify-content:space-between;
+    }
+
+    .leftGroup,.rightGroup{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+    }
+
+    .brand{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      padding: 6px 10px;
+      border-radius: 12px;
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.10);
+    }
+    .dot{
+      width:10px;height:10px;border-radius:999px;
+      background: conic-gradient(from 180deg, var(--A), var(--B));
+      box-shadow: 0 0 16px rgba(255,255,255,.35);
+    }
+    .title{
+      color: var(--text);
+      font-weight: 700;
+      letter-spacing:.2px;
+      font-size: 14px;
+      line-height: 1;
+    }
+    .subtitle{
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 2px;
+      line-height: 1;
+    }
+
+    .field{
+      display:flex;
+      gap:8px;
+      align-items:center;
+      padding: 6px 10px;
+      border-radius: 12px;
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.10);
+    }
+
+    label{
+      color: var(--muted);
+      font-size: 12px;
+      user-select:none;
+    }
+
     input{
-      border-radius:10px;border:1px solid rgba(255,255,255,.25);
-      background:rgba(255,255,255,.08);color:#fff;padding:8px 10px;outline:none
+      width: 150px;
+      border: none;
+      outline:none;
+      color: var(--text);
+      background: transparent;
+      font-size: 14px;
     }
+    input.wide{ width: 260px; }
+
     button{
-      border-radius:10px;border:1px solid rgba(255,255,255,.25);
-      background:rgba(255,255,255,.12);color:#fff;padding:8px 10px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,.18);
+      background: rgba(255,255,255,.10);
+      color: var(--text);
+      padding: 9px 12px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform .04s ease, background .15s ease, border-color .15s ease;
+      user-select:none;
     }
-    #canvas{width:100vw;height:100vh;display:block}
-    #me{margin-left:6px;opacity:.95}
+    button:hover{
+      background: rgba(255,255,255,.14);
+      border-color: rgba(255,255,255,.26);
+    }
+    button:active{
+      transform: translateY(1px);
+    }
+
+    .btnPrimary{
+      background: rgba(64,196,255,.16);
+      border-color: rgba(64,196,255,.30);
+    }
+    .btnPrimary:hover{
+      background: rgba(64,196,255,.20);
+      border-color: rgba(64,196,255,.40);
+    }
+
+    .btnDanger{
+      background: rgba(255,77,125,.16);
+      border-color: rgba(255,77,125,.30);
+    }
+    .btnDanger:hover{
+      background: rgba(255,77,125,.20);
+      border-color: rgba(255,77,125,.40);
+    }
+
+    .statusLine{
+      margin-top: 10px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      flex-wrap:wrap;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .pill{
+      display:inline-flex;
+      gap:8px;
+      align-items:center;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.10);
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .pill strong{ color: var(--text); font-weight: 700; }
+
+    .help{
+      opacity:.9;
+    }
+
+    /* Center debug overlay (kept on purpose) */
+    .debug{
+      position: fixed;
+      left: 50%;
+      top: 54%;
+      transform: translate(-50%,-50%);
+      z-index: 10;
+      width: min(420px, calc(100% - 48px));
+      pointer-events:none;
+      text-align:center;
+      color: var(--text);
+    }
+
+    .debugCard{
+      background: rgba(0,0,0,.34);
+      border: 1px solid rgba(255,255,255,.14);
+      border-radius: 18px;
+      padding: 14px 16px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 18px 55px rgba(0,0,0,.35);
+    }
+
+    .debugTop{
+      display:flex;
+      justify-content:center;
+      gap:10px;
+      flex-wrap:wrap;
+      margin-bottom: 10px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .big{
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing:.2px;
+      line-height: 1.05;
+      margin: 4px 0 6px;
+    }
+    .small{
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.2;
+    }
+
+    .hint{
+      margin-top: 10px;
+      color: rgba(255,255,255,.75);
+      font-size: 12px;
+    }
+    .hint code{
+      color: rgba(255,255,255,.92);
+    }
+
+    @media (max-width: 560px){
+      input{ width: 120px; }
+      input.wide{ width: 200px; }
+      .big{ font-size: 28px; }
+    }
   </style>
 </head>
+
 <body>
-  <div id="ui">
-    <div class="card">
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <label>Room:</label>
-        <input id="room" value="room1" />
-        <label>WS:</label>
-        <input id="ws" style="min-width:260px" value="wss://color-war-all.onrender.com" />
-        <button id="connect">Connect</button>
-        <button id="motion">Enable Motion</button>
-        <button id="reset">Reset</button>
-        <span id="me">我是谁：?</span>
+  <!-- Top control panel -->
+  <div class="hud">
+    <div class="panel">
+      <div class="row">
+        <div class="leftGroup">
+          <div class="brand">
+            <div class="dot"></div>
+            <div>
+              <div class="title">Color War</div>
+              <div class="subtitle">Tilt battle via WebSocket</div>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="name">Name</label>
+            <input id="name" placeholder="e.g. Cindy" />
+            <button id="setName" class="btnPrimary">Set Name</button>
+          </div>
+
+          <div class="field">
+            <label for="room">Room</label>
+            <input id="room" value="room1" />
+          </div>
+
+          <div class="field">
+            <label for="ws">WS</label>
+            <input id="ws" class="wide" value="wss://color-war-server.onrender.com" />
+          </div>
+        </div>
+
+        <div class="rightGroup">
+          <button id="connect" class="btnPrimary">Connect</button>
+          <button id="motion">Enable Motion</button>
+          <button id="reset" class="btnDanger">Reset</button>
+        </div>
       </div>
-      <div style="margin-top:6px;font-size:12px;opacity:.9" id="status">状态：未连接</div>
-      <div style="margin-top:6px;font-size:12px;opacity:.8">
-        A(粉)：向左倾才有力｜B(蓝)：向右倾才有力｜回正会回到中线
+
+      <div class="statusLine">
+        <div class="pill"><strong>Me</strong> <span id="meLabel">Unknown</span></div>
+        <div class="pill"><strong>Status</strong> <span id="status">Idle</span></div>
+        <div class="pill help">
+          <span><strong>A</strong> (pink): tilt <code>left</code></span>
+          <span>·</span>
+          <span><strong>B</strong> (blue): tilt <code>right</code></span>
+          <span>·</span>
+          <span>neutral tilt returns to center</span>
+        </div>
       </div>
     </div>
   </div>
 
+  <!-- Canvas -->
   <canvas id="canvas"></canvas>
 
+  <!-- Center debug overlay (kept) -->
+  <div class="debug">
+    <div class="debugCard">
+      <div class="debugTop" id="debugTop">
+        <span>role: <strong id="roleTxt">?</strong></span>
+        <span>·</span>
+        <span>id: <strong id="idTxt">?</strong></span>
+        <span>·</span>
+        <span>players: <strong id="playersTxt">0</strong></span>
+      </div>
+      <div class="big">
+        raw <span id="rawTxt">0.00</span> · power <span id="powTxt">0.00</span>
+      </div>
+      <div class="small">
+        p <span id="pTxt">0.50</span> · ws <span id="wsTxt">null</span>
+      </div>
+      <div class="hint">
+        Tip: tap <strong>Connect</strong> first (get role), then <strong>Enable Motion</strong>.
+      </div>
+    </div>
+  </div>
+
 <script>
-  const canvas = document.getElementById("canvas");
-  const ctx = canvas.getContext("2d");
+/* =========================
+   Color War (Front-end)
+   - Hosts the UI and canvas rendering
+   - Reads device orientation (gamma)
+   - Sends "power" to WebSocket server
+   - Receives "state" with p (color split)
+   ========================= */
 
-  function resize(){
-    canvas.width = Math.floor(window.innerWidth * devicePixelRatio);
-    canvas.height = Math.floor(window.innerHeight * devicePixelRatio);
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+/* --- UI elements --- */
+const $ = (id) => document.getElementById(id);
+const ui = {
+  name: $("name"),
+  setName: $("setName"),
+  room: $("room"),
+  ws: $("ws"),
+  connect: $("connect"),
+  motion: $("motion"),
+  reset: $("reset"),
+  status: $("status"),
+  meLabel: $("meLabel"),
+
+  roleTxt: $("roleTxt"),
+  idTxt: $("idTxt"),
+  playersTxt: $("playersTxt"),
+  rawTxt: $("rawTxt"),
+  powTxt: $("powTxt"),
+  pTxt: $("pTxt"),
+  wsTxt: $("wsTxt"),
+};
+
+function setStatus(text){
+  ui.status.textContent = text;
+}
+
+/* --- Canvas resize (use DPR for crisp text/lines) --- */
+function resize(){
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width  = Math.floor(window.innerWidth * dpr);
+  canvas.height = Math.floor(window.innerHeight * dpr);
+}
+window.addEventListener("resize", resize);
+resize();
+
+/* --- Game state --- */
+const COLOR_A = getComputedStyle(document.documentElement).getPropertyValue("--A").trim();
+const COLOR_B = getComputedStyle(document.documentElement).getPropertyValue("--B").trim();
+
+let ws = null;
+let connected = false;
+
+let role = null;     // "A" (left/pink) or "B" (right/blue)
+let myId = null;     // unique id sent to server
+let myName = "Player";
+
+/* raw: immediate strength (0..1), power: smoothed strength (0..1) */
+let motionEnabled = false;
+let raw = 0;
+let power = 0;
+
+/* p: split ratio from server, 0..1 (left color width = p) */
+let p = 0.5;
+let players = [];
+let winner = null;
+
+/* --- Load saved name (localStorage) --- */
+(function initName(){
+  const saved = localStorage.getItem("colorwar_name");
+  if(saved && saved.trim()){
+    myName = saved.trim().slice(0, 16);
+    ui.name.value = myName;
+  }else{
+    ui.name.value = myName;
   }
-  window.addEventListener("resize", resize);
-  resize();
+  ui.meLabel.textContent = myName;
+})();
 
-  const $ = (id)=>document.getElementById(id);
+/* --- Set name button --- */
+ui.setName.addEventListener("click", () => {
+  const v = (ui.name.value || "").trim().slice(0, 16);
+  if(!v){
+    setStatus("Please enter a name.");
+    return;
+  }
+  myName = v;
+  localStorage.setItem("colorwar_name", myName);
+  ui.meLabel.textContent = myName;
 
-  const COLOR_A = "#ff4d7d"; // 左粉
-  const COLOR_B = "#40c4ff"; // 右蓝
+  /* If already connected, you can reconnect to apply new id to the server */
+  setStatus("Name set. Reconnect to apply.");
+});
 
-  let ws = null;
-  let connected = false;
-
-  let role = null;       // "A" or "B"
-  let myId = null;
-
-  let motionEnabled = false;
-  let raw = 0;           // 0..1 (带死区后的力量)
-  let power = 0;         // 平滑后的 0..1
-  let p = 0.5;           // 服务器发来的 0..1
-  let winner = null;
-  let players = [];
-
-  function setStatus(t){ $("status").textContent = "状态：" + t; }
-  function clamp01(x){ return Math.max(0, Math.min(1, x)); }
-
-  // ✅ iPhone 权限
-  async function enableMotion(){
-    try{
-      if(typeof DeviceOrientationEvent !== "undefined" &&
-         typeof DeviceOrientationEvent.requestPermission === "function"){
-        const res = await DeviceOrientationEvent.requestPermission();
-        // res 可能是 "granted"；即便不是也继续，让你能看到调试值
-      }
-      motionEnabled = true;
-      setStatus("运动权限已启用（现在倾斜手机）");
-    }catch(e){
-      motionEnabled = true; // 尽量别卡死
-      setStatus("已尝试启用运动权限（若没反应请用 Safari）");
+/* --- iOS permission request for DeviceOrientationEvent --- */
+async function enableMotion(){
+  try{
+    if(typeof DeviceOrientationEvent !== "undefined" &&
+       typeof DeviceOrientationEvent.requestPermission === "function"){
+      const res = await DeviceOrientationEvent.requestPermission();
+      /* res is usually "granted" on iOS */
     }
+    motionEnabled = true;
+    setStatus("Motion enabled. Tilt your phone.");
+  }catch(e){
+    /* If permission flow fails, still enable and let the user test */
+    motionEnabled = true;
+    setStatus("Motion enabled (fallback). If no response, use Safari.");
   }
+}
+ui.motion.addEventListener("click", enableMotion);
 
-  // ✅ 方向规则：A 左倾才有力；B 右倾才有力；回正死区=0
-  window.addEventListener("deviceorientation", (e)=>{
-    if(!motionEnabled) return;
+/* --- Convert tilt to raw power (directional) ---
+   A: left tilt gives power
+   B: right tilt gives power
+   Neutral tilt (dead zone) => raw = 0 (helps return to center)
+*/
+window.addEventListener("deviceorientation", (e) => {
+  if(!motionEnabled) return;
 
-    const gamma = e.gamma || 0; // 左右倾斜，通常右正左负
-    const dead = 8;             // 回正死区（度）
-    const maxDeg = 55;          // 接近满力（度）
+  const gamma = e.gamma || 0; // left/right tilt; often right positive, left negative
+  const dead = 8;             // degrees: within this range considered neutral
+  const maxDeg = 55;          // degrees: near full power
 
-    // role 未拿到前先按 A 处理
-    const signed = (role === "B") ? gamma : -gamma; // 朝自己方向为正
+  /* If role is not known yet, default to A behavior */
+  const signed = (role === "B") ? gamma : -gamma; // "tilt toward your side" becomes positive
 
-    if (signed < dead) raw = 0;
-    else raw = clamp01((signed - dead) / (maxDeg - dead));
-  }, true);
+  if(signed < dead){
+    raw = 0;
+  }else{
+    raw = Math.max(0, Math.min(1, (signed - dead) / (maxDeg - dead)));
+  }
+}, true);
 
-  function connect(){
-    const room = $("room").value.trim() || "room1";
-    const url  = $("ws").value.trim();
+/* --- Connect to WebSocket server and join room ---
+   We embed the chosen name into the id so the server can show who is who.
+*/
+function connect(){
+  const room = (ui.room.value || "room1").trim() || "room1";
+  const url  = (ui.ws.value || "").trim();
 
-    myId = "p" + Math.random().toString(16).slice(2,6);
+  /* Generate an id that includes name (simple and readable) */
+  const suffix = Math.random().toString(16).slice(2,6);
+  myId = `${myName}-${suffix}`;
 
-    if(ws) ws.close();
+  /* Close previous socket */
+  if(ws) ws.close();
 
+  try{
     ws = new WebSocket(url);
+  }catch(e){
+    setStatus("Invalid WebSocket URL.");
+    return;
+  }
 
-    ws.onopen = ()=>{
-      connected = true;
-      setStatus(`已连接，加入房间 ${room}...`);
-      ws.send(JSON.stringify({ type:"join", room, id: myId }));
-    };
+  ui.wsTxt.textContent = "connecting";
+  setStatus("Connecting...");
 
-    ws.onmessage = (ev)=>{
-      let d;
-      try{ d = JSON.parse(ev.data); }catch{ return; }
+  ws.onopen = () => {
+    connected = true;
+    ui.wsTxt.textContent = "1";
+    setStatus(`Connected. Joining room "${room}"...`);
 
-      if(d.type === "role"){
-        role = d.role;
-        $("me").textContent = (role === "A") ? "我是谁：左边 A（粉色）" : "我是谁：右边 B（蓝色）";
-        setStatus(`房间已加入，你是 ${role}`);
+    /* Join message expected by the server */
+    ws.send(JSON.stringify({ type: "join", room, id: myId }));
+  };
+
+  ws.onmessage = (ev) => {
+    let d;
+    try{ d = JSON.parse(ev.data); }catch{ return; }
+
+    /* Server assigns role: A or B */
+    if(d.type === "role"){
+      role = d.role;
+      ui.roleTxt.textContent = role || "?";
+      ui.idTxt.textContent = myId || "?";
+
+      const who = role === "A"
+        ? `${myName} — A (Pink / Left)`
+        : `${myName} — B (Blue / Right)`;
+
+      ui.meLabel.textContent = who;
+      setStatus(`Joined as ${role}. Now enable motion and tilt.`);
+    }
+
+    /* State update: p, players, winner */
+    if(d.type === "state"){
+      p = d.p;
+      players = d.players || [];
+      winner = d.winner || null;
+
+      ui.playersTxt.textContent = String(players.length);
+      ui.pTxt.textContent = Number(p).toFixed(2);
+
+      if(winner){
+        setStatus(`${winner} wins! Tap Reset to play again.`);
       }
+    }
+  };
 
-      if(d.type === "state"){
-        p = d.p;
-        players = d.players || [];
-        winner = d.winner || null;
-      }
-    };
+  ws.onerror = () => {
+    setStatus("WebSocket error. Check Render status / WS URL.");
+  };
 
-    ws.onclose = ()=>{
-      connected = false;
-      setStatus("已断开");
-      role = null;
-      winner = null;
-      players = [];
-    };
+  ws.onclose = () => {
+    connected = false;
+    ui.wsTxt.textContent = "null";
+    setStatus("Disconnected.");
+    role = null;
+    winner = null;
+    players = [];
+    ui.roleTxt.textContent = "?";
+    ui.playersTxt.textContent = "0";
+  };
+}
+ui.connect.addEventListener("click", connect);
 
-    ws.onerror = ()=>{
-      setStatus("连接出错（检查 wss 地址 / Render 是否 Live）");
-    };
+/* --- Reset round (server sets p=0.5 and clears winner) --- */
+function reset(){
+  if(ws && ws.readyState === 1){
+    ws.send(JSON.stringify({ type: "reset" }));
+    setStatus("Reset sent.");
+  }else{
+    setStatus("Not connected.");
+  }
+}
+ui.reset.addEventListener("click", reset);
+
+/* --- Main loop: smooth power, send to server, draw canvas, update debug --- */
+function loop(){
+  /* Smooth the control signal to reduce jitter */
+  power += (raw - power) * 0.12;
+
+  /* Send power to server (0..1) */
+  if(ws && ws.readyState === 1){
+    ws.send(JSON.stringify({ type: "power", value: power }));
   }
 
-  function reset(){
-    if(ws && connected){
-      ws.send(JSON.stringify({ type:"reset" }));
-    }
-  }
+  draw();
+  updateDebug();
 
-  $("connect").onclick = connect;
-  $("motion").onclick = enableMotion;
-  $("reset").onclick  = reset;
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
 
-  function loop(){
-    // 平滑 power，避免抖
-    power += (raw - power) * 0.12;
+/* --- Draw the color battle field --- */
+function draw(){
+  const w = canvas.width;
+  const h = canvas.height;
 
-    // 上报给服务器
-    if(ws && ws.readyState === 1){
-      ws.send(JSON.stringify({ type:"power", value: power }));
-    }
+  /* If winner exists, show a dark overlay */
+  if(winner){
+    ctx.fillStyle = "rgba(0,0,0,0.65)";
+    ctx.fillRect(0,0,w,h);
 
-    draw();
-    requestAnimationFrame(loop);
-  }
-
-  function draw(){
-    const w = canvas.width, h = canvas.height;
-
-    // 胜利遮罩
-    if(winner){
-      ctx.fillStyle = "rgba(0,0,0,0.65)";
-      ctx.fillRect(0,0,w,h);
-      ctx.fillStyle = "#fff";
-      ctx.font = `${42*devicePixelRatio}px system-ui`;
-      ctx.textAlign = "center";
-      ctx.fillText(`${winner} WINS!`, w/2, h/2);
-      ctx.textAlign = "left";
-      return;
-    }
-
-    // 主色块（p 从服务器来）
-    const aW = Math.floor(w * p);
-
-    ctx.fillStyle = COLOR_A;
-    ctx.fillRect(0, 0, aW, h);
-
-    ctx.fillStyle = COLOR_B;
-    ctx.fillRect(aW, 0, w - aW, h);
-
-    // 中线
-    ctx.globalAlpha = 0.25;
-    ctx.fillStyle = "#fff";
-    ctx.fillRect(aW-2, 0, 4, h);
-    ctx.globalAlpha = 1;
-
-    // 中央调试信息（你确定稳定后可以删掉这块）
-    ctx.fillStyle = "rgba(0,0,0,0.35)";
-    ctx.fillRect(w/2 - 190*devicePixelRatio, h/2 - 90*devicePixelRatio, 380*devicePixelRatio, 180*devicePixelRatio);
-
-    ctx.fillStyle = "#fff";
+    ctx.fillStyle = "white";
     ctx.textAlign = "center";
-    ctx.font = `${18*devicePixelRatio}px system-ui`;
-    ctx.fillText(`role: ${role || "?"}   id: ${myId || "?"}`, w/2, h/2 - 35*devicePixelRatio);
-    ctx.fillText(`raw: ${raw.toFixed(2)}   power: ${power.toFixed(2)}`, w/2, h/2);
-    ctx.fillText(`p: ${p.toFixed(2)}   players: ${players.length}`, w/2, h/2 + 35*devicePixelRatio);
-
-    ctx.font = `${12*devicePixelRatio}px system-ui`;
-    const list = players.map(x => `${x.role||"?"}:${x.id}:${Number(x.power).toFixed(2)}`).join("   ");
-    ctx.fillText(list || "-", w/2, h/2 + 62*devicePixelRatio);
-
+    ctx.font = `${Math.floor(48 * (window.devicePixelRatio||1))}px system-ui`;
+    ctx.fillText("WINNER", w/2, h/2 - 20*(window.devicePixelRatio||1));
+    ctx.font = `${Math.floor(22 * (window.devicePixelRatio||1))}px system-ui`;
+    ctx.fillText(String(winner), w/2, h/2 + 20*(window.devicePixelRatio||1));
     ctx.textAlign = "left";
+    return;
   }
 
-  loop();
+  /* Draw split colors based on p */
+  const aW = Math.floor(w * p);
+
+  ctx.fillStyle = COLOR_A;
+  ctx.fillRect(0, 0, aW, h);
+
+  ctx.fillStyle = COLOR_B;
+  ctx.fillRect(aW, 0, w - aW, h);
+
+  /* Center line */
+  ctx.globalAlpha = 0.22;
+  ctx.fillStyle = "white";
+  ctx.fillRect(aW - 2, 0, 4, h);
+  ctx.globalAlpha = 1;
+}
+
+/* --- Update center debug overlay values --- */
+function updateDebug(){
+  ui.rawTxt.textContent = raw.toFixed(2);
+  ui.powTxt.textContent = power.toFixed(2);
+
+  ui.pTxt.textContent = Number(p).toFixed(2);
+
+  if(ws) ui.wsTxt.textContent = String(ws.readyState);
+  else ui.wsTxt.textContent = "null";
+
+  ui.roleTxt.textContent = role || "?";
+  ui.idTxt.textContent = myId || "?";
+  ui.playersTxt.textContent = String(players.length);
+}
+
+/* Start in a friendly state */
+setStatus("Idle. Set your name, then Connect.");
 </script>
 </body>
 </html>
